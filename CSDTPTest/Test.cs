@@ -9,7 +9,6 @@ namespace CSDTPTest
         public void TestCSDTP()
         {
             System.Console.WriteLine("Hello, CSDTP!");
-            Assert.IsTrue(false);
         }
     }
 }
