@@ -1,11 +1,14 @@
-﻿namespace CSDTP
+﻿using System.Net;
+using System.Net.Sockets;
+
+namespace CSDTP
 {
     public abstract class Client
     {
         private bool blocking;
         private bool eventBlocking;
         private bool connected = false;
-        // TODO: add client socket
+        private Socket? sock;
 
         public Client(bool blocking_, bool eventBlocking_)
         {
@@ -17,7 +20,20 @@
 
         public void Connect(string host, ushort port)
         {
-            // TODO: connect to server
+            if (connected)
+            {
+                // TODO: throw exception
+            }
+
+            IPHostEntry hostEntry = Dns.GetHostEntry(host);
+            IPAddress address = hostEntry.AddressList[0];
+            IPEndPoint ipe = new IPEndPoint(address, port);
+
+            sock = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            sock.Connect(ipe);
+
+            connected = true;
+            CallHandle();
         }
 
         public void Connect(string host)
@@ -37,12 +53,26 @@
 
         public void Disconnect()
         {
-            // TODO: disconnect from server
+            if (!connected)
+            {
+                // TODO: throw exception
+            }
+
+            sock?.Shutdown(SocketShutdown.Both);
+            sock?.Close();
+
+            connected = false;
         }
 
         public void Send(byte[] data)
         {
-            // TODO: send data to server
+            if (!connected)
+            {
+                // TODO: throw exception
+            }
+
+            byte[] encodedData = Util.EncodeMessage(data);
+            sock?.Send(encodedData);
         }
 
         public bool IsConnected()
@@ -52,19 +82,66 @@
 
         public string GetHost()
         {
-            // TODO: return server host
-            return "";
+            if (!connected)
+            {
+                // TODO: throw exception
+            }
+
+            IPEndPoint ipe = sock.LocalEndPoint as IPEndPoint;
+            return ipe.Address.ToString();
         }
 
         public ushort GetPort()
         {
-            // TODO: return server port
-            return 0;
+            if (!connected)
+            {
+                // TODO: throw exception
+            }
+
+            IPEndPoint ipe = sock.LocalEndPoint as IPEndPoint;
+            return Convert.ToUInt16(ipe.Port);
+        }
+
+        public string GetServerHost()
+        {
+            if (!connected)
+            {
+                // TODO: throw exception
+            }
+
+            IPEndPoint ipe = sock.RemoteEndPoint as IPEndPoint;
+            return ipe.Address.ToString();
+        }
+
+        public ushort GetServerPort()
+        {
+            if (!connected)
+            {
+                // TODO: throw exception
+            }
+
+            IPEndPoint ipe = sock.RemoteEndPoint as IPEndPoint;
+            return Convert.ToUInt16(ipe.Port);
+        }
+
+        private void CallHandle()
+        {
+            // TODO: call handle method
         }
 
         private void Handle()
         {
             // TODO: handle messages from server
+        }
+
+        private void CallReceive(byte[] data)
+        {
+            // TODO: call receive event method
+        }
+
+        private void CallDisconnected()
+        {
+            // TODO: call disconnected event method
         }
 
         protected abstract void Receive(byte[] data);

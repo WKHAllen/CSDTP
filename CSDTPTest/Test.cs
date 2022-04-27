@@ -1,4 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 
 namespace CSDTPTest
 {
@@ -8,7 +9,7 @@ namespace CSDTPTest
         [TestMethod]
         public void TestCSDTP()
         {
-            System.Console.WriteLine("Hello, CSDTP!");
+            Console.WriteLine("Hello, CSDTP!");
         }
     }
 }

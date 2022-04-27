@@ -1,12 +1,15 @@
-﻿namespace CSDTP
+﻿using System.Net;
+using System.Net.Sockets;
+
+namespace CSDTP
 {
     public abstract class Server
     {
         private bool blocking;
         private bool eventBlocking;
         private bool serving = false;
-        // TODO: add server listener socket
-        // TODO: add client socket map
+        private Socket? sock;
+        private Dictionary<ulong, Socket> clients = new Dictionary<ulong, Socket>();
         private ulong nextClientID = 0;
 
         public Server(bool blocking_, bool eventBlocking_)
@@ -19,7 +22,21 @@
 
         public void Start(string host, ushort port)
         {
-            // TODO: start the server
+            if (serving)
+            {
+                // TODO: throw exception
+            }
+
+            IPHostEntry hostEntry = Dns.GetHostEntry(host);
+            IPAddress address = hostEntry.AddressList[0];
+            IPEndPoint ipe = new IPEndPoint(address, port);
+
+            sock = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            sock.Bind(ipe);
+            sock.Listen(Util.listenBacklog);
+
+            serving = true;
+            CallServe();
         }
 
         public void Start(string host)
@@ -39,22 +56,74 @@
 
         public void Stop()
         {
-            // TODO: stop the server
+            if (!serving)
+            {
+                // TODO: throw exception
+            }
+
+            foreach (KeyValuePair<ulong, Socket> client in clients)
+            {
+                RemoveClient(client.Key);
+            }
+
+            sock?.Close();
+            serving = false;
         }
 
         public void Send(ulong clientID, byte[] data)
         {
-            // TODO: send data
+            if (!serving)
+            {
+                // TODO: throw exception
+            }
+
+            Socket? client = clients.GetValueOrDefault(clientID);
+
+            if (client != null)
+            {
+                byte[] encodedData = Util.EncodeMessage(data);
+                client.Send(encodedData);
+            }
+            else
+            {
+                // TODO: throw exception
+            }
         }
 
         public void SendAll(byte[] data)
         {
-            // TODO: send data to all clients
+            if (!serving)
+            {
+                // TODO: throw exception
+            }
+
+            byte[] encodedData = Util.EncodeMessage(data);
+
+            foreach (KeyValuePair<ulong, Socket> client in clients)
+            {
+                client.Value.Send(encodedData);
+            }
         }
 
         public void RemoveClient(ulong clientID)
         {
-            // TODO: remove the client
+            if (!serving)
+            {
+                // TODO: throw exception
+            }
+
+            Socket? client = clients.GetValueOrDefault(clientID);
+
+            if (client != null)
+            {
+                client.Shutdown(SocketShutdown.Both);
+                client.Close();
+                clients.Remove(clientID);
+            }
+            else
+            {
+                // TODO: throw exception
+            }
         }
 
         public bool IsServing()
@@ -64,14 +133,76 @@
 
         public string GetHost()
         {
-            // TODO: return server listener host
-            return "";
+            if (!serving)
+            {
+                // TODO: throw exception
+            }
+
+            IPEndPoint ipe = sock.LocalEndPoint as IPEndPoint;
+            return ipe.Address.ToString();
         }
 
         public ushort GetPort()
         {
-            // TODO: return server listener port
-            return 0;
+            if (!serving)
+            {
+                // TODO: throw exception
+            }
+
+            IPEndPoint ipe = sock.LocalEndPoint as IPEndPoint;
+            return Convert.ToUInt16(ipe.Port);
+        }
+
+        public string GetClientHost(ulong clientID)
+        {
+            if (!serving)
+            {
+                // TODO: throw exception
+            }
+
+            Socket? client = clients.GetValueOrDefault(clientID);
+
+            if (client != null)
+            {
+                IPEndPoint ipe = client.RemoteEndPoint as IPEndPoint;
+                return ipe.Address.ToString();
+            }
+            else
+            {
+                // TODO: throw exception
+                return "";
+            }
+        }
+
+        public ushort GetClientPort(ulong clientID)
+        {
+            if (!serving)
+            {
+                // TODO: throw exception
+            }
+
+            Socket? client = clients.GetValueOrDefault(clientID);
+
+            if (client != null)
+            {
+                IPEndPoint ipe = client.RemoteEndPoint as IPEndPoint;
+                return Convert.ToUInt16(ipe.Port);
+            }
+            else
+            {
+                // TODO: throw exception
+                return 0;
+            }
+        }
+
+        private ulong NewClientID()
+        {
+            return nextClientID++;
+        }
+
+        private void CallServe()
+        {
+            // TODO: call serve method
         }
 
         private void Serve()
@@ -79,9 +210,19 @@
             // TODO: serve clients
         }
 
-        private ulong NewClientID()
+        private void CallReceive(ulong clientID, byte[] data)
         {
-            return nextClientID++;
+            // TODO: call receive event method
+        }
+
+        private void CallConnect(ulong clientID)
+        {
+            // TODO: call connect event method
+        }
+
+        private void CallDisconnect(ulong clientID)
+        {
+            // TODO: call disconnect event method
         }
 
         protected abstract void Receive(ulong clientID, byte[] data);
