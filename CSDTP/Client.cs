@@ -5,10 +5,11 @@ namespace CSDTP
 {
     public abstract class Client
     {
-        private bool blocking;
-        private bool eventBlocking;
+        private readonly bool blocking;
+        private readonly bool eventBlocking;
         private bool connected = false;
         private Socket? sock;
+        private Thread? handleThread;
 
         public Client(bool blocking_, bool eventBlocking_)
         {
@@ -126,7 +127,15 @@ namespace CSDTP
 
         private void CallHandle()
         {
-            // TODO: call handle method
+            if (blocking)
+            {
+                Handle();
+            }
+            else
+            {
+                handleThread = new Thread(() => Handle());
+                handleThread.Start();
+            }
         }
 
         private void Handle()
@@ -136,12 +145,26 @@ namespace CSDTP
 
         private void CallReceive(byte[] data)
         {
-            // TODO: call receive event method
+            if (eventBlocking)
+            {
+                Receive(data);
+            }
+            else
+            {
+                new Thread(() => Receive(data)).Start();
+            }
         }
 
         private void CallDisconnected()
         {
-            // TODO: call disconnected event method
+            if (eventBlocking)
+            {
+                Disconnected();
+            }
+            else
+            {
+                new Thread(() => Disconnected()).Start();
+            }
         }
 
         protected abstract void Receive(byte[] data);

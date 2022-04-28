@@ -5,10 +5,11 @@ namespace CSDTP
 {
     public abstract class Server
     {
-        private bool blocking;
-        private bool eventBlocking;
+        private readonly bool blocking;
+        private readonly bool eventBlocking;
         private bool serving = false;
         private Socket? sock;
+        private Thread? serveThread;
         private Dictionary<ulong, Socket> clients = new Dictionary<ulong, Socket>();
         private ulong nextClientID = 0;
 
@@ -202,7 +203,15 @@ namespace CSDTP
 
         private void CallServe()
         {
-            // TODO: call serve method
+            if (blocking)
+            {
+                Serve();
+            }
+            else
+            {
+                serveThread = new Thread(() => Serve());
+                serveThread.Start();
+            }
         }
 
         private void Serve()
@@ -212,17 +221,38 @@ namespace CSDTP
 
         private void CallReceive(ulong clientID, byte[] data)
         {
-            // TODO: call receive event method
+            if (eventBlocking)
+            {
+                Receive(clientID, data);
+            }
+            else
+            {
+                new Thread(() => Receive(clientID, data));
+            }
         }
 
         private void CallConnect(ulong clientID)
         {
-            // TODO: call connect event method
+            if (eventBlocking)
+            {
+                Connect(clientID);
+            }
+            else
+            {
+                new Thread(() => Connect(clientID));
+            }
         }
 
         private void CallDisconnect(ulong clientID)
         {
-            // TODO: call disconnect event method
+            if (eventBlocking)
+            {
+                Disconnect(clientID);
+            }
+            else
+            {
+                new Thread(() => Disconnect(clientID));
+            }
         }
 
         protected abstract void Receive(ulong clientID, byte[] data);
