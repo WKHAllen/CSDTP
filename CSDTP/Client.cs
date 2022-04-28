@@ -59,10 +59,15 @@ namespace CSDTP
                 // TODO: throw exception
             }
 
-            sock?.Shutdown(SocketShutdown.Both);
-            sock?.Close();
-
             connected = false;
+
+            sock.Shutdown(SocketShutdown.Both);
+            sock.Close();
+
+            if (handleThread != null && handleThread != Thread.CurrentThread)
+            {
+                handleThread.Join();
+            }
         }
 
         public void Send(byte[] data)
@@ -73,7 +78,7 @@ namespace CSDTP
             }
 
             byte[] encodedData = Util.EncodeMessage(data);
-            sock?.Send(encodedData);
+            sock.Send(encodedData);
         }
 
         public bool IsConnected()
@@ -140,7 +145,41 @@ namespace CSDTP
 
         private void Handle()
         {
-            // TODO: handle messages from server
+            byte[] sizeBuffer = new byte[Util.lenSize];
+
+            while (connected)
+            {
+                try
+                {
+                    sock.Receive(sizeBuffer, Util.lenSize, SocketFlags.None);
+                }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
+
+                ulong messageSize = Util.DecodeMessageSize(sizeBuffer);
+                byte[] messageBuffer = new byte[messageSize];
+
+                try
+                {
+                    sock.Receive(messageBuffer, Convert.ToInt32(messageSize), SocketFlags.None);
+                }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
+
+                CallReceive(messageBuffer);
+            }
+
+            if (connected)
+            {
+                connected = false;
+                sock.Close();
+
+                CallDisconnected();
+            }
         }
 
         private void CallReceive(byte[] data)

@@ -62,13 +62,19 @@ namespace CSDTP
                 // TODO: throw exception
             }
 
+            serving = false;
+
             foreach (KeyValuePair<ulong, Socket> client in clients)
             {
                 RemoveClient(client.Key);
             }
 
-            sock?.Close();
-            serving = false;
+            sock.Close();
+
+            if (serveThread != null && serveThread != Thread.CurrentThread)
+            {
+                serveThread.Join();
+            }
         }
 
         public void Send(ulong clientID, byte[] data)
@@ -216,7 +222,90 @@ namespace CSDTP
 
         private void Serve()
         {
-            // TODO: serve clients
+            while (serving)
+            {
+                List<Socket> readSocks = new List<Socket>(clients.Values.ToArray());
+                readSocks.Add(sock);
+
+                List<Socket> errorSocks = new List<Socket>(clients.Values.ToArray());
+                errorSocks.Add(sock);
+
+                Socket.Select(readSocks, null, errorSocks, -1);
+
+                if (!serving)
+                {
+                    return;
+                }
+
+                foreach (Socket readSock in readSocks)
+                {
+                    if (readSock == sock)
+                    {
+                        Socket newClient = sock.Accept();
+                        ulong newClientID = NewClientID();
+
+                        clients.Add(newClientID, newClient);
+
+                        CallConnect(newClientID);
+                    }
+                    else
+                    {
+                        ulong clientID = clients.FirstOrDefault(client => client.Value == readSock).Key;
+                        byte[] sizeBuffer = new byte[Util.lenSize];
+
+                        try
+                        {
+                            sock.Receive(sizeBuffer, Util.lenSize, SocketFlags.None);
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            clients[clientID].Close();
+                            clients.Remove(clientID);
+
+                            CallDisconnect(clientID);
+                        }
+
+                        ulong messageSize = Util.DecodeMessageSize(sizeBuffer);
+                        byte[] messageBuffer = new byte[messageSize];
+
+                        try
+                        {
+                            sock.Receive(messageBuffer, Convert.ToInt32(messageSize), SocketFlags.None);
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            clients[clientID].Close();
+                            clients.Remove(clientID);
+
+                            CallDisconnect(clientID);
+                        }
+
+                        CallReceive(clientID, messageBuffer);
+                    }
+                }
+
+                foreach (Socket errorSock in errorSocks)
+                {
+                    if (errorSock == sock)
+                    {
+                        if (serving)
+                        {
+                            Stop();
+                        }
+
+                        return;
+                    }
+                    else
+                    {
+                        ulong clientID = clients.FirstOrDefault(client => client.Value == errorSock).Key;
+
+                        clients[clientID].Close();
+                        clients.Remove(clientID);
+
+                        CallDisconnect(clientID);
+                    }
+                }
+            }
         }
 
         private void CallReceive(ulong clientID, byte[] data)
