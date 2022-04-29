@@ -25,7 +25,7 @@ namespace CSDTP
         {
             if (serving)
             {
-                // TODO: throw exception
+                throw new CSDTPException("server is already serving");
             }
 
             IPHostEntry hostEntry = Dns.GetHostEntry(host);
@@ -59,7 +59,7 @@ namespace CSDTP
         {
             if (!serving)
             {
-                // TODO: throw exception
+                throw new CSDTPException("server is not serving");
             }
 
             serving = false;
@@ -81,7 +81,7 @@ namespace CSDTP
         {
             if (!serving)
             {
-                // TODO: throw exception
+                throw new CSDTPException("server is not serving");
             }
 
             Socket? client = clients.GetValueOrDefault(clientID);
@@ -93,7 +93,7 @@ namespace CSDTP
             }
             else
             {
-                // TODO: throw exception
+                throw new CSDTPException("client does not exist");
             }
         }
 
@@ -101,7 +101,7 @@ namespace CSDTP
         {
             if (!serving)
             {
-                // TODO: throw exception
+                throw new CSDTPException("server is not serving");
             }
 
             byte[] encodedData = Util.EncodeMessage(data);
@@ -116,7 +116,7 @@ namespace CSDTP
         {
             if (!serving)
             {
-                // TODO: throw exception
+                throw new CSDTPException("server is not serving");
             }
 
             Socket? client = clients.GetValueOrDefault(clientID);
@@ -129,7 +129,7 @@ namespace CSDTP
             }
             else
             {
-                // TODO: throw exception
+                throw new CSDTPException("client does not exist");
             }
         }
 
@@ -142,7 +142,7 @@ namespace CSDTP
         {
             if (!serving)
             {
-                // TODO: throw exception
+                throw new CSDTPException("server is not serving");
             }
 
             IPEndPoint ipe = sock.LocalEndPoint as IPEndPoint;
@@ -153,7 +153,7 @@ namespace CSDTP
         {
             if (!serving)
             {
-                // TODO: throw exception
+                throw new CSDTPException("server is not serving");
             }
 
             IPEndPoint ipe = sock.LocalEndPoint as IPEndPoint;
@@ -164,7 +164,7 @@ namespace CSDTP
         {
             if (!serving)
             {
-                // TODO: throw exception
+                throw new CSDTPException("server is not serving");
             }
 
             Socket? client = clients.GetValueOrDefault(clientID);
@@ -176,8 +176,7 @@ namespace CSDTP
             }
             else
             {
-                // TODO: throw exception
-                return "";
+                throw new CSDTPException("client does not exist");
             }
         }
 
@@ -185,7 +184,7 @@ namespace CSDTP
         {
             if (!serving)
             {
-                // TODO: throw exception
+                throw new CSDTPException("server is not serving");
             }
 
             Socket? client = clients.GetValueOrDefault(clientID);
@@ -197,8 +196,7 @@ namespace CSDTP
             }
             else
             {
-                // TODO: throw exception
-                return 0;
+                throw new CSDTPException("client does not exist");
             }
         }
 

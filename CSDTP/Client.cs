@@ -23,7 +23,7 @@ namespace CSDTP
         {
             if (connected)
             {
-                // TODO: throw exception
+                throw new CSDTPException("client is already connected to a server");
             }
 
             IPHostEntry hostEntry = Dns.GetHostEntry(host);
@@ -56,7 +56,7 @@ namespace CSDTP
         {
             if (!connected)
             {
-                // TODO: throw exception
+                throw new CSDTPException("client is not connected to a server");
             }
 
             connected = false;
@@ -74,7 +74,7 @@ namespace CSDTP
         {
             if (!connected)
             {
-                // TODO: throw exception
+                throw new CSDTPException("client is not connected to a server");
             }
 
             byte[] encodedData = Util.EncodeMessage(data);
@@ -90,7 +90,7 @@ namespace CSDTP
         {
             if (!connected)
             {
-                // TODO: throw exception
+                throw new CSDTPException("client is not connected to a server");
             }
 
             IPEndPoint ipe = sock.LocalEndPoint as IPEndPoint;
@@ -101,7 +101,7 @@ namespace CSDTP
         {
             if (!connected)
             {
-                // TODO: throw exception
+                throw new CSDTPException("client is not connected to a server");
             }
 
             IPEndPoint ipe = sock.LocalEndPoint as IPEndPoint;
@@ -112,7 +112,7 @@ namespace CSDTP
         {
             if (!connected)
             {
-                // TODO: throw exception
+                throw new CSDTPException("client is not connected to a server");
             }
 
             IPEndPoint ipe = sock.RemoteEndPoint as IPEndPoint;
@@ -123,7 +123,7 @@ namespace CSDTP
         {
             if (!connected)
             {
-                // TODO: throw exception
+                throw new CSDTPException("client is not connected to a server");
             }
 
             IPEndPoint ipe = sock.RemoteEndPoint as IPEndPoint;
