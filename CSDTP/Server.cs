@@ -3,24 +3,68 @@ using System.Net.Sockets;
 
 namespace CSDTP
 {
+    /// <summary>
+    /// A socket server.
+    /// </summary>
     public abstract class Server
     {
+        /// <summary>
+        /// If the server will block while serving clients.
+        /// </summary>
         private readonly bool blocking;
+
+        /// <summary>
+        /// If the server will block while calling event methods.
+        /// </summary>
         private readonly bool eventBlocking;
+
+        /// <summary>
+        /// If the server is currently serving.
+        /// </summary>
         private bool serving = false;
+
+        /// <summary>
+        /// The server socket.
+        /// </summary>
         private Socket? sock;
+
+        /// <summary>
+        /// The thread from which the server will serve clients.
+        /// </summary>
         private Thread? serveThread;
+
+        /// <summary>
+        /// A collection of the client sockets.
+        /// </summary>
         private Dictionary<ulong, Socket> clients = new Dictionary<ulong, Socket>();
+
+        /// <summary>
+        /// The next available client ID.
+        /// </summary>
         private ulong nextClientID = 0;
 
+        /// <summary>
+        /// Instantiate a socket server.
+        /// </summary>
+        /// <param name="blocking_">if the server should block while serving clients.</param>
+        /// <param name="eventBlocking_">if the server should block while calling event methods.</param>
         public Server(bool blocking_, bool eventBlocking_)
         {
             blocking = blocking_;
             eventBlocking = eventBlocking_;
         }
 
+        /// <summary>
+        /// Instantiate a socket server.
+        /// </summary>
         public Server() : this(false, false) { }
 
+        /// <summary>
+        /// Start the socket server.
+        /// </summary>
+        /// <param name="host">the address to host the server on.</param>
+        /// <param name="port">the port to host the server on.</param>
+        /// <exception cref="CSDTPException">Thrown when the server is already serving.</exception>
         public void Start(string host, ushort port)
         {
             if (serving)
@@ -40,21 +84,36 @@ namespace CSDTP
             CallServe();
         }
 
+        /// <summary>
+        /// Start the socket server, using the default port.
+        /// </summary>
+        /// <param name="host">the address to host the server on.</param>
         public void Start(string host)
         {
             Start(host, Util.defaultPort);
         }
 
+        /// <summary>
+        /// Start the socket server, using the default host.
+        /// </summary>
+        /// <param name="port">the port to host the server on.</param>
         public void Start(ushort port)
         {
             Start(Util.defaultHost, port);
         }
 
+        /// <summary>
+        /// Start the socket server, using the default host and port.
+        /// </summary>
         public void Start()
         {
             Start(Util.defaultHost, Util.defaultPort);
         }
 
+        /// <summary>
+        /// Stop the server.
+        /// </summary>
+        /// <exception cref="CSDTPException">Thrown when the server is not serving.</exception>
         public void Stop()
         {
             if (!serving)
@@ -77,6 +136,12 @@ namespace CSDTP
             }
         }
 
+        /// <summary>
+        /// Send data to a client.
+        /// </summary>
+        /// <param name="clientID">the ID of the client to send the data to.</param>
+        /// <param name="data">the data to send.</param>
+        /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
         public void Send(ulong clientID, byte[] data)
         {
             if (!serving)
@@ -97,6 +162,11 @@ namespace CSDTP
             }
         }
 
+        /// <summary>
+        /// Send data to all clients.
+        /// </summary>
+        /// <param name="data">the data to send</param>
+        /// <exception cref="CSDTPException">Thrown when the server is not serving.</exception>
         public void SendAll(byte[] data)
         {
             if (!serving)
@@ -112,6 +182,11 @@ namespace CSDTP
             }
         }
 
+        /// <summary>
+        /// Disconnect a client from the server.
+        /// </summary>
+        /// <param name="clientID">the ID of the client to disconnect.</param>
+        /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
         public void RemoveClient(ulong clientID)
         {
             if (!serving)
@@ -133,11 +208,20 @@ namespace CSDTP
             }
         }
 
+        /// <summary>
+        /// Check if the server is serving.
+        /// </summary>
+        /// <returns>Whether the server is serving.</returns>
         public bool IsServing()
         {
             return serving;
         }
 
+        /// <summary>
+        /// Get the host address of the server.
+        /// </summary>
+        /// <returns>The host address of the server.</returns>
+        /// <exception cref="CSDTPException">Thrown when the server is not serving.</exception>
         public string GetHost()
         {
             if (!serving)
@@ -149,6 +233,11 @@ namespace CSDTP
             return ipe.Address.ToString();
         }
 
+        /// <summary>
+        /// Get the port of the server.
+        /// </summary>
+        /// <returns>The port of the server.</returns>
+        /// <exception cref="CSDTPException">Thrown when the server is not serving.</exception>
         public ushort GetPort()
         {
             if (!serving)
@@ -160,6 +249,12 @@ namespace CSDTP
             return Convert.ToUInt16(ipe.Port);
         }
 
+        /// <summary>
+        /// Get the host of a client.
+        /// </summary>
+        /// <param name="clientID">the ID of the client.</param>
+        /// <returns>The host of the client.</returns>
+        /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
         public string GetClientHost(ulong clientID)
         {
             if (!serving)
@@ -180,6 +275,12 @@ namespace CSDTP
             }
         }
 
+        /// <summary>
+        /// Get the port of a client.
+        /// </summary>
+        /// <param name="clientID">the ID of the client.</param>
+        /// <returns>The port of the client.</returns>
+        /// <exception cref="CSDTPException"></exception>
         public ushort GetClientPort(ulong clientID)
         {
             if (!serving)
@@ -200,11 +301,18 @@ namespace CSDTP
             }
         }
 
+        /// <summary>
+        /// Get the next available client ID.
+        /// </summary>
+        /// <returns>The next available client ID.</returns>
         private ulong NewClientID()
         {
             return nextClientID++;
         }
 
+        /// <summary>
+        /// Call the serve method.
+        /// </summary>
         private void CallServe()
         {
             if (blocking)
@@ -218,6 +326,9 @@ namespace CSDTP
             }
         }
 
+        /// <summary>
+        /// Serve clients.
+        /// </summary>
         private void Serve()
         {
             while (serving)
@@ -306,6 +417,11 @@ namespace CSDTP
             }
         }
 
+        /// <summary>
+        /// Call the receive event method.
+        /// </summary>
+        /// <param name="clientID">the ID of the client who sent the data.</param>
+        /// <param name="data">the data received from the client.</param>
         private void CallReceive(ulong clientID, byte[] data)
         {
             if (eventBlocking)
@@ -318,6 +434,10 @@ namespace CSDTP
             }
         }
 
+        /// <summary>
+        /// Call the connect event method.
+        /// </summary>
+        /// <param name="clientID">the ID of the client who connected.</param>
         private void CallConnect(ulong clientID)
         {
             if (eventBlocking)
@@ -330,6 +450,10 @@ namespace CSDTP
             }
         }
 
+        /// <summary>
+        /// Call the disconnect event method.
+        /// </summary>
+        /// <param name="clientID">the ID of the client who disconnected.</param>
         private void CallDisconnect(ulong clientID)
         {
             if (eventBlocking)
@@ -342,10 +466,23 @@ namespace CSDTP
             }
         }
 
+        /// <summary>
+        /// An event method, called when data is received from a client.
+        /// </summary>
+        /// <param name="clientID">the ID of the client who sent the data.</param>
+        /// <param name="data">the data received from the client.</param>
         protected abstract void Receive(ulong clientID, byte[] data);
 
+        /// <summary>
+        /// An event method, called when a client connects.
+        /// </summary>
+        /// <param name="clientID">the ID of the client who connected.</param>
         protected abstract void Connect(ulong clientID);
 
+        /// <summary>
+        /// An event method, called when a client disconnects.
+        /// </summary>
+        /// <param name="clientID">the ID of the client who disconnected.</param>
         protected abstract void Disconnect(ulong clientID);
     }
 }
