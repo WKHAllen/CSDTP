@@ -75,9 +75,9 @@ namespace CSDTPTest
 
             // Generate large random messages
             Random random = new Random();
-            byte[] randomMessageToServer = new byte[random.Next(32768, 65535)];
+            byte[] randomMessageToServer = new byte[random.Next(16384, 32767)];
             random.NextBytes(randomMessageToServer);
-            byte[] randomMessageToClient = new byte[random.Next(65536, 98304)];
+            byte[] randomMessageToClient = new byte[random.Next(32768, 65535)];
             random.NextBytes(randomMessageToClient);
             Console.WriteLine("Large random message sizes: {0}, {1}", randomMessageToServer.Length, randomMessageToClient.Length);
 
