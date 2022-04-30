@@ -121,14 +121,13 @@ namespace CSDTP
                 throw new CSDTPException("server is not serving");
             }
 
-            serving = false;
-
             foreach (KeyValuePair<ulong, Socket> client in clients)
             {
                 RemoveClient(client.Key);
             }
 
             sock.Close();
+            serving = false;
 
             if (serveThread != null && serveThread != Thread.CurrentThread)
             {
@@ -339,7 +338,17 @@ namespace CSDTP
                 List<Socket> errorSocks = new List<Socket>(clients.Values.ToArray());
                 errorSocks.Add(sock);
 
-                Socket.Select(readSocks, null, errorSocks, -1);
+                try
+                {
+                    Socket.Select(readSocks, null, errorSocks, -1);
+                }
+                catch (SocketException)
+                {
+                    if (!serving)
+                    {
+                        return;
+                    }
+                }
 
                 if (!serving)
                 {
@@ -364,14 +373,30 @@ namespace CSDTP
 
                         try
                         {
-                            sock.Receive(sizeBuffer, Util.lenSize, SocketFlags.None);
-                        }
-                        catch (ObjectDisposedException)
-                        {
-                            clients[clientID].Close();
-                            clients.Remove(clientID);
+                            int bytesReceived = readSock.Receive(sizeBuffer, Util.lenSize, SocketFlags.None);
 
-                            CallDisconnect(clientID);
+                            if (bytesReceived == 0)
+                            {
+                                if (clients.ContainsKey(clientID))
+                                {
+                                    clients[clientID].Close();
+                                    clients.Remove(clientID);
+
+                                    CallDisconnect(clientID);
+                                    continue;
+                                }
+                            }
+                        }
+                        catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException)
+                        {
+                            if (clients.ContainsKey(clientID))
+                            {
+                                clients[clientID].Close();
+                                clients.Remove(clientID);
+
+                                CallDisconnect(clientID);
+                                continue;
+                            }
                         }
 
                         ulong messageSize = Util.DecodeMessageSize(sizeBuffer);
@@ -379,14 +404,30 @@ namespace CSDTP
 
                         try
                         {
-                            sock.Receive(messageBuffer, Convert.ToInt32(messageSize), SocketFlags.None);
-                        }
-                        catch (ObjectDisposedException)
-                        {
-                            clients[clientID].Close();
-                            clients.Remove(clientID);
+                            int bytesReceived = readSock.Receive(messageBuffer, Convert.ToInt32(messageSize), SocketFlags.None);
 
-                            CallDisconnect(clientID);
+                            if (bytesReceived == 0)
+                            {
+                                if (clients.ContainsKey(clientID))
+                                {
+                                    clients[clientID].Close();
+                                    clients.Remove(clientID);
+
+                                    CallDisconnect(clientID);
+                                    continue;
+                                }
+                            }
+                        }
+                        catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException)
+                        {
+                            if (clients.ContainsKey(clientID))
+                            {
+                                clients[clientID].Close();
+                                clients.Remove(clientID);
+
+                                CallDisconnect(clientID);
+                                continue;
+                            }
                         }
 
                         CallReceive(clientID, messageBuffer);
@@ -408,10 +449,13 @@ namespace CSDTP
                     {
                         ulong clientID = clients.FirstOrDefault(client => client.Value == errorSock).Key;
 
-                        clients[clientID].Close();
-                        clients.Remove(clientID);
+                        if (clients.ContainsKey(clientID))
+                        {
+                            clients[clientID].Close();
+                            clients.Remove(clientID);
 
-                        CallDisconnect(clientID);
+                            CallDisconnect(clientID);
+                        }
                     }
                 }
             }

@@ -54,10 +54,10 @@ namespace CSDTP
         {
             ulong size = 0;
 
-            for (int i = lenSize; i < lenSize; i++)
+            for (int i = 0; i < lenSize; i++)
             {
                 size <<= 8;
-                size += encodedMessageSize[i];
+                size += Convert.ToUInt64(encodedMessageSize[i]);
             }
 
             return size;

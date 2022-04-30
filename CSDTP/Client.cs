@@ -237,9 +237,14 @@ namespace CSDTP
             {
                 try
                 {
-                    sock.Receive(sizeBuffer, Util.lenSize, SocketFlags.None);
+                    int bytesReceived = sock.Receive(sizeBuffer, Util.lenSize, SocketFlags.None);
+
+                    if (bytesReceived == 0)
+                    {
+                        break;
+                    }
                 }
-                catch (ObjectDisposedException)
+                catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException)
                 {
                     break;
                 }
@@ -249,9 +254,14 @@ namespace CSDTP
 
                 try
                 {
-                    sock.Receive(messageBuffer, Convert.ToInt32(messageSize), SocketFlags.None);
+                    int bytesReceived = sock.Receive(messageBuffer, Convert.ToInt32(messageSize), SocketFlags.None);
+
+                    if (bytesReceived == 0)
+                    {
+                        break;
+                    }
                 }
-                catch (ObjectDisposedException)
+                catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException)
                 {
                     break;
                 }
