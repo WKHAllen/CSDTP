@@ -121,13 +121,14 @@ namespace CSDTP
                 throw new CSDTPException("server is not serving");
             }
 
+            serving = false;
+
             foreach (KeyValuePair<ulong, Socket> client in clients)
             {
                 RemoveClient(client.Key);
             }
 
             sock.Close();
-            serving = false;
 
             if (serveThread != null && serveThread != Thread.CurrentThread)
             {
