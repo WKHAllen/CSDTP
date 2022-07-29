@@ -475,7 +475,7 @@ namespace CSDTP
             }
             else
             {
-                new Thread(() => Receive(clientID, data));
+                new Thread(() => Receive(clientID, data)).Start();
             }
         }
 
@@ -491,7 +491,7 @@ namespace CSDTP
             }
             else
             {
-                new Thread(() => Connect(clientID));
+                new Thread(() => Connect(clientID)).Start();
             }
         }
 
@@ -507,7 +507,7 @@ namespace CSDTP
             }
             else
             {
-                new Thread(() => Disconnect(clientID));
+                new Thread(() => Disconnect(clientID)).Start();
             }
         }
 
