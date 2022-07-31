@@ -250,10 +250,10 @@ namespace CSDTP
         }
 
         /// <summary>
-        /// Get the host of a client.
+        /// Get the host address of a client.
         /// </summary>
         /// <param name="clientID">the ID of the client.</param>
-        /// <returns>The host of the client.</returns>
+        /// <returns>The host address of the client.</returns>
         /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
         public string GetClientHost(ulong clientID)
         {
@@ -280,7 +280,7 @@ namespace CSDTP
         /// </summary>
         /// <param name="clientID">the ID of the client.</param>
         /// <returns>The port of the client.</returns>
-        /// <exception cref="CSDTPException"></exception>
+        /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
         public ushort GetClientPort(ulong clientID)
         {
             if (!serving)
