@@ -125,7 +125,9 @@ namespace CSDTP
 
             foreach (KeyValuePair<ulong, Socket> client in clients)
             {
-                RemoveClient(client.Key);
+                client.Value.Shutdown(SocketShutdown.Both);
+                client.Value.Close();
+                clients.Remove(client.Key);
             }
 
             sock.Close();
