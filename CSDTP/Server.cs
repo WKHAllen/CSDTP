@@ -1,535 +1,447 @@
-﻿using System.Net;
+﻿using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
 
-namespace CSDTP
+namespace CSDTP;
+
+/// <summary>
+///     A socket server.
+/// </summary>
+public abstract class Server
 {
     /// <summary>
-    /// A socket server.
+    ///     A collection of the client sockets.
     /// </summary>
-    public abstract class Server
+    private readonly Dictionary<ulong, Socket> _clients = new();
+
+    /// <summary>
+    ///     The next available client ID.
+    /// </summary>
+    private ulong _nextClientId;
+
+    /// <summary>
+    ///     The thread from which the server will serve clients.
+    /// </summary>
+    private Thread? _serveThread;
+
+    /// <summary>
+    ///     If the server is currently serving.
+    /// </summary>
+    private bool _serving;
+
+    /// <summary>
+    ///     The server socket.
+    /// </summary>
+    private Socket? _sock;
+
+    /// <summary>
+    ///     Start the socket server.
+    /// </summary>
+    /// <param name="host">the address to host the server on.</param>
+    /// <param name="port">the port to host the server on.</param>
+    /// <exception cref="CSDTPException">Thrown when the server is already serving.</exception>
+    public void Start(string host, ushort port)
     {
-        /// <summary>
-        /// If the server will block while serving clients.
-        /// </summary>
-        private readonly bool blocking;
+        if (_serving) throw new CSDTPException("server is already serving");
 
-        /// <summary>
-        /// If the server will block while calling event methods.
-        /// </summary>
-        private readonly bool eventBlocking;
+        var hostEntry = Dns.GetHostEntry(host);
+        var address = hostEntry.AddressList[0];
+        var ipe = new IPEndPoint(address, port);
 
-        /// <summary>
-        /// If the server is currently serving.
-        /// </summary>
-        private bool serving = false;
+        _sock = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        _sock.Bind(ipe);
+        _sock.Listen(Util.ListenBacklog);
 
-        /// <summary>
-        /// The server socket.
-        /// </summary>
-        private Socket? sock;
+        _serving = true;
+        CallServe();
+    }
 
-        /// <summary>
-        /// The thread from which the server will serve clients.
-        /// </summary>
-        private Thread? serveThread;
+    /// <summary>
+    ///     Start the socket server, using the default port.
+    /// </summary>
+    /// <param name="host">the address to host the server on.</param>
+    public void Start(string host)
+    {
+        Start(host, Util.DefaultPort);
+    }
 
-        /// <summary>
-        /// A collection of the client sockets.
-        /// </summary>
-        private Dictionary<ulong, Socket> clients = new Dictionary<ulong, Socket>();
+    /// <summary>
+    ///     Start the socket server, using the default host.
+    /// </summary>
+    /// <param name="port">the port to host the server on.</param>
+    public void Start(ushort port)
+    {
+        Start(Util.DefaultHost, port);
+    }
 
-        /// <summary>
-        /// The next available client ID.
-        /// </summary>
-        private ulong nextClientID = 0;
+    /// <summary>
+    ///     Start the socket server, using the default host and port.
+    /// </summary>
+    public void Start()
+    {
+        Start(Util.DefaultHost, Util.DefaultPort);
+    }
 
-        /// <summary>
-        /// Instantiate a socket server.
-        /// </summary>
-        /// <param name="blocking_">if the server should block while serving clients.</param>
-        /// <param name="eventBlocking_">if the server should block while calling event methods.</param>
-        public Server(bool blocking_, bool eventBlocking_)
+    /// <summary>
+    ///     Stop the server.
+    /// </summary>
+    /// <exception cref="CSDTPException">Thrown when the server is not serving.</exception>
+    public void Stop()
+    {
+        if (!_serving) throw new CSDTPException("server is not serving");
+
+        _serving = false;
+
+        foreach (var client in _clients)
         {
-            blocking = blocking_;
-            eventBlocking = eventBlocking_;
+            client.Value.Shutdown(SocketShutdown.Both);
+            client.Value.Close();
+            _clients.Remove(client.Key);
         }
 
-        /// <summary>
-        /// Instantiate a socket server.
-        /// </summary>
-        public Server() : this(false, false) { }
+        _sock?.Close();
 
-        /// <summary>
-        /// Start the socket server.
-        /// </summary>
-        /// <param name="host">the address to host the server on.</param>
-        /// <param name="port">the port to host the server on.</param>
-        /// <exception cref="CSDTPException">Thrown when the server is already serving.</exception>
-        public void Start(string host, ushort port)
+        if (_serveThread != null && _serveThread != Thread.CurrentThread) _serveThread.Join();
+    }
+
+    /// <summary>
+    ///     Send data to a client.
+    /// </summary>
+    /// <param name="clientId">the ID of the client to send the data to.</param>
+    /// <param name="data">the data to send.</param>
+    /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
+    public void Send(ulong clientId, byte[] data)
+    {
+        if (!_serving) throw new CSDTPException("server is not serving");
+
+        var client = _clients.GetValueOrDefault(clientId);
+
+        if (client != null)
         {
-            if (serving)
-            {
-                throw new CSDTPException("server is already serving");
-            }
-
-            IPHostEntry hostEntry = Dns.GetHostEntry(host);
-            IPAddress address = hostEntry.AddressList[0];
-            IPEndPoint ipe = new IPEndPoint(address, port);
-
-            sock = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            sock.Bind(ipe);
-            sock.Listen(Util.listenBacklog);
-
-            serving = true;
-            CallServe();
+            var encodedData = Util.EncodeMessage(data);
+            client.Send(encodedData);
         }
-
-        /// <summary>
-        /// Start the socket server, using the default port.
-        /// </summary>
-        /// <param name="host">the address to host the server on.</param>
-        public void Start(string host)
+        else
         {
-            Start(host, Util.defaultPort);
+            throw new CSDTPException("client does not exist");
         }
+    }
 
-        /// <summary>
-        /// Start the socket server, using the default host.
-        /// </summary>
-        /// <param name="port">the port to host the server on.</param>
-        public void Start(ushort port)
+    /// <summary>
+    ///     Send data to all clients.
+    /// </summary>
+    /// <param name="data">the data to send</param>
+    /// <exception cref="CSDTPException">Thrown when the server is not serving.</exception>
+    public void SendAll(byte[] data)
+    {
+        if (!_serving) throw new CSDTPException("server is not serving");
+
+        var encodedData = Util.EncodeMessage(data);
+
+        foreach (var client in _clients) client.Value.Send(encodedData);
+    }
+
+    /// <summary>
+    ///     Disconnect a client from the server.
+    /// </summary>
+    /// <param name="clientId">the ID of the client to disconnect.</param>
+    /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
+    public void RemoveClient(ulong clientId)
+    {
+        if (!_serving) throw new CSDTPException("server is not serving");
+
+        var client = _clients.GetValueOrDefault(clientId);
+
+        if (client != null)
         {
-            Start(Util.defaultHost, port);
+            client.Shutdown(SocketShutdown.Both);
+            client.Close();
+            _clients.Remove(clientId);
         }
-
-        /// <summary>
-        /// Start the socket server, using the default host and port.
-        /// </summary>
-        public void Start()
+        else
         {
-            Start(Util.defaultHost, Util.defaultPort);
+            throw new CSDTPException("client does not exist");
         }
+    }
 
-        /// <summary>
-        /// Stop the server.
-        /// </summary>
-        /// <exception cref="CSDTPException">Thrown when the server is not serving.</exception>
-        public void Stop()
-        {
-            if (!serving)
-            {
-                throw new CSDTPException("server is not serving");
-            }
+    /// <summary>
+    ///     Check if the server is serving.
+    /// </summary>
+    /// <returns>Whether the server is serving.</returns>
+    public bool IsServing()
+    {
+        return _serving;
+    }
 
-            serving = false;
+    /// <summary>
+    ///     Get the host address of the server.
+    /// </summary>
+    /// <returns>The host address of the server.</returns>
+    /// <exception cref="CSDTPException">
+    ///     Thrown when the server is not serving, or when the server's host could not be
+    ///     acquired.
+    /// </exception>
+    public string GetHost()
+    {
+        if (!_serving) throw new CSDTPException("server is not serving");
 
-            foreach (KeyValuePair<ulong, Socket> client in clients)
-            {
-                client.Value.Shutdown(SocketShutdown.Both);
-                client.Value.Close();
-                clients.Remove(client.Key);
-            }
+        var ipe = _sock?.LocalEndPoint as IPEndPoint;
+        var host = ipe?.Address.ToString();
 
-            sock.Close();
+        if (host != null)
+            return host;
 
-            if (serveThread != null && serveThread != Thread.CurrentThread)
-            {
-                serveThread.Join();
-            }
-        }
+        throw new CSDTPException("could not get server host");
+    }
 
-        /// <summary>
-        /// Send data to a client.
-        /// </summary>
-        /// <param name="clientID">the ID of the client to send the data to.</param>
-        /// <param name="data">the data to send.</param>
-        /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
-        public void Send(ulong clientID, byte[] data)
-        {
-            if (!serving)
-            {
-                throw new CSDTPException("server is not serving");
-            }
+    /// <summary>
+    ///     Get the port of the server.
+    /// </summary>
+    /// <returns>The port of the server.</returns>
+    /// <exception cref="CSDTPException">
+    ///     Thrown when the server is not serving, or when the server's port could not be
+    ///     acquired.
+    /// </exception>
+    public ushort GetPort()
+    {
+        if (!_serving) throw new CSDTPException("server is not serving");
 
-            Socket? client = clients.GetValueOrDefault(clientID);
-
-            if (client != null)
-            {
-                byte[] encodedData = Util.EncodeMessage(data);
-                client.Send(encodedData);
-            }
-            else
-            {
-                throw new CSDTPException("client does not exist");
-            }
-        }
-
-        /// <summary>
-        /// Send data to all clients.
-        /// </summary>
-        /// <param name="data">the data to send</param>
-        /// <exception cref="CSDTPException">Thrown when the server is not serving.</exception>
-        public void SendAll(byte[] data)
-        {
-            if (!serving)
-            {
-                throw new CSDTPException("server is not serving");
-            }
-
-            byte[] encodedData = Util.EncodeMessage(data);
-
-            foreach (KeyValuePair<ulong, Socket> client in clients)
-            {
-                client.Value.Send(encodedData);
-            }
-        }
-
-        /// <summary>
-        /// Disconnect a client from the server.
-        /// </summary>
-        /// <param name="clientID">the ID of the client to disconnect.</param>
-        /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
-        public void RemoveClient(ulong clientID)
-        {
-            if (!serving)
-            {
-                throw new CSDTPException("server is not serving");
-            }
-
-            Socket? client = clients.GetValueOrDefault(clientID);
-
-            if (client != null)
-            {
-                client.Shutdown(SocketShutdown.Both);
-                client.Close();
-                clients.Remove(clientID);
-            }
-            else
-            {
-                throw new CSDTPException("client does not exist");
-            }
-        }
-
-        /// <summary>
-        /// Check if the server is serving.
-        /// </summary>
-        /// <returns>Whether the server is serving.</returns>
-        public bool IsServing()
-        {
-            return serving;
-        }
-
-        /// <summary>
-        /// Get the host address of the server.
-        /// </summary>
-        /// <returns>The host address of the server.</returns>
-        /// <exception cref="CSDTPException">Thrown when the server is not serving.</exception>
-        public string GetHost()
-        {
-            if (!serving)
-            {
-                throw new CSDTPException("server is not serving");
-            }
-
-            IPEndPoint ipe = sock.LocalEndPoint as IPEndPoint;
-            return ipe.Address.ToString();
-        }
-
-        /// <summary>
-        /// Get the port of the server.
-        /// </summary>
-        /// <returns>The port of the server.</returns>
-        /// <exception cref="CSDTPException">Thrown when the server is not serving.</exception>
-        public ushort GetPort()
-        {
-            if (!serving)
-            {
-                throw new CSDTPException("server is not serving");
-            }
-
-            IPEndPoint ipe = sock.LocalEndPoint as IPEndPoint;
+        if (_sock?.LocalEndPoint is IPEndPoint ipe)
             return Convert.ToUInt16(ipe.Port);
-        }
 
-        /// <summary>
-        /// Get the host address of a client.
-        /// </summary>
-        /// <param name="clientID">the ID of the client.</param>
-        /// <returns>The host address of the client.</returns>
-        /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
-        public string GetClientHost(ulong clientID)
+        throw new CSDTPException("could not get server port");
+    }
+
+    /// <summary>
+    ///     Get the host address of a client.
+    /// </summary>
+    /// <param name="clientId">the ID of the client.</param>
+    /// <returns>The host address of the client.</returns>
+    /// <exception cref="CSDTPException">
+    ///     Thrown when the server is not serving, if the specified client does not exist, or if
+    ///     the client's host could not be acquired.
+    /// </exception>
+    public string GetClientHost(ulong clientId)
+    {
+        if (!_serving) throw new CSDTPException("server is not serving");
+
+        var client = _clients.GetValueOrDefault(clientId);
+
+        if (client == null) throw new CSDTPException("client does not exist");
+
+        var ipe = client.RemoteEndPoint as IPEndPoint;
+        var host = ipe?.Address.ToString();
+
+        if (host != null)
+            return host;
+
+        throw new CSDTPException("could not get client host");
+    }
+
+    /// <summary>
+    ///     Get the port of a client.
+    /// </summary>
+    /// <param name="clientId">the ID of the client.</param>
+    /// <returns>The port of the client.</returns>
+    /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
+    public ushort GetClientPort(ulong clientId)
+    {
+        if (!_serving) throw new CSDTPException("server is not serving");
+
+        var client = _clients.GetValueOrDefault(clientId);
+
+        if (client == null) throw new CSDTPException("client does not exist");
+
+        if (client.RemoteEndPoint is IPEndPoint ipe)
+            return Convert.ToUInt16(ipe.Port);
+
+        throw new CSDTPException("could not get client port");
+    }
+
+    /// <summary>
+    ///     Get the next available client ID.
+    /// </summary>
+    /// <returns>The next available client ID.</returns>
+    private ulong NewClientId()
+    {
+        return _nextClientId++;
+    }
+
+    /// <summary>
+    ///     Call the serve method.
+    /// </summary>
+    private void CallServe()
+    {
+        _serveThread = new Thread(() => Serve());
+        _serveThread.Start();
+    }
+
+    /// <summary>
+    ///     Serve clients.
+    /// </summary>
+    private void Serve()
+    {
+        while (_serving)
         {
-            if (!serving)
+            Debug.Assert(_sock != null);
+
+            var readSocks = new List<Socket>(_clients.Values.ToArray());
+            readSocks.Add(_sock);
+
+            var errorSocks = new List<Socket>(_clients.Values.ToArray());
+            errorSocks.Add(_sock);
+
+            try
             {
-                throw new CSDTPException("server is not serving");
+                Socket.Select(readSocks, null, errorSocks, -1);
+            }
+            catch (SocketException)
+            {
+                if (!_serving) return;
             }
 
-            Socket? client = clients.GetValueOrDefault(clientID);
+            if (!_serving) return;
 
-            if (client != null)
-            {
-                IPEndPoint ipe = client.RemoteEndPoint as IPEndPoint;
-                return ipe.Address.ToString();
-            }
-            else
-            {
-                throw new CSDTPException("client does not exist");
-            }
-        }
-
-        /// <summary>
-        /// Get the port of a client.
-        /// </summary>
-        /// <param name="clientID">the ID of the client.</param>
-        /// <returns>The port of the client.</returns>
-        /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
-        public ushort GetClientPort(ulong clientID)
-        {
-            if (!serving)
-            {
-                throw new CSDTPException("server is not serving");
-            }
-
-            Socket? client = clients.GetValueOrDefault(clientID);
-
-            if (client != null)
-            {
-                IPEndPoint ipe = client.RemoteEndPoint as IPEndPoint;
-                return Convert.ToUInt16(ipe.Port);
-            }
-            else
-            {
-                throw new CSDTPException("client does not exist");
-            }
-        }
-
-        /// <summary>
-        /// Get the next available client ID.
-        /// </summary>
-        /// <returns>The next available client ID.</returns>
-        private ulong NewClientID()
-        {
-            return nextClientID++;
-        }
-
-        /// <summary>
-        /// Call the serve method.
-        /// </summary>
-        private void CallServe()
-        {
-            if (blocking)
-            {
-                Serve();
-            }
-            else
-            {
-                serveThread = new Thread(() => Serve());
-                serveThread.Start();
-            }
-        }
-
-        /// <summary>
-        /// Serve clients.
-        /// </summary>
-        private void Serve()
-        {
-            while (serving)
-            {
-                List<Socket> readSocks = new List<Socket>(clients.Values.ToArray());
-                readSocks.Add(sock);
-
-                List<Socket> errorSocks = new List<Socket>(clients.Values.ToArray());
-                errorSocks.Add(sock);
-
-                try
+            foreach (var readSock in readSocks)
+                if (readSock == _sock)
                 {
-                    Socket.Select(readSocks, null, errorSocks, -1);
+                    var newClient = _sock.Accept();
+                    var newClientId = NewClientId();
+
+                    _clients.Add(newClientId, newClient);
+
+                    CallConnect(newClientId);
                 }
-                catch (SocketException)
+                else
                 {
-                    if (!serving)
+                    var clientId = _clients.FirstOrDefault(client => client.Value == readSock).Key;
+                    var sizeBuffer = new byte[Util.LenSize];
+
+                    try
                     {
-                        return;
+                        var bytesReceived = readSock.Receive(sizeBuffer, Util.LenSize, SocketFlags.None);
+
+                        if (bytesReceived == 0)
+                            if (_clients.ContainsKey(clientId))
+                            {
+                                _clients[clientId].Close();
+                                _clients.Remove(clientId);
+
+                                CallDisconnect(clientId);
+                                continue;
+                            }
                     }
+                    catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException)
+                    {
+                        if (_clients.ContainsKey(clientId))
+                        {
+                            _clients[clientId].Close();
+                            _clients.Remove(clientId);
+
+                            CallDisconnect(clientId);
+                            continue;
+                        }
+                    }
+
+                    var messageSize = Util.DecodeMessageSize(sizeBuffer);
+                    var messageBuffer = new byte[messageSize];
+
+                    try
+                    {
+                        var bytesReceived =
+                            readSock.Receive(messageBuffer, Convert.ToInt32(messageSize), SocketFlags.None);
+
+                        if (bytesReceived == 0)
+                            if (_clients.ContainsKey(clientId))
+                            {
+                                _clients[clientId].Close();
+                                _clients.Remove(clientId);
+
+                                CallDisconnect(clientId);
+                                continue;
+                            }
+                    }
+                    catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException)
+                    {
+                        if (_clients.ContainsKey(clientId))
+                        {
+                            _clients[clientId].Close();
+                            _clients.Remove(clientId);
+
+                            CallDisconnect(clientId);
+                            continue;
+                        }
+                    }
+
+                    CallReceive(clientId, messageBuffer);
                 }
 
-                if (!serving)
+            foreach (var errorSock in errorSocks)
+                if (errorSock == _sock)
                 {
+                    if (_serving) Stop();
+
                     return;
                 }
-
-                foreach (Socket readSock in readSocks)
+                else
                 {
-                    if (readSock == sock)
+                    var clientId = _clients.FirstOrDefault(client => client.Value == errorSock).Key;
+
+                    if (_clients.ContainsKey(clientId))
                     {
-                        Socket newClient = sock.Accept();
-                        ulong newClientID = NewClientID();
+                        _clients[clientId].Close();
+                        _clients.Remove(clientId);
 
-                        clients.Add(newClientID, newClient);
-
-                        CallConnect(newClientID);
-                    }
-                    else
-                    {
-                        ulong clientID = clients.FirstOrDefault(client => client.Value == readSock).Key;
-                        byte[] sizeBuffer = new byte[Util.lenSize];
-
-                        try
-                        {
-                            int bytesReceived = readSock.Receive(sizeBuffer, Util.lenSize, SocketFlags.None);
-
-                            if (bytesReceived == 0)
-                            {
-                                if (clients.ContainsKey(clientID))
-                                {
-                                    clients[clientID].Close();
-                                    clients.Remove(clientID);
-
-                                    CallDisconnect(clientID);
-                                    continue;
-                                }
-                            }
-                        }
-                        catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException)
-                        {
-                            if (clients.ContainsKey(clientID))
-                            {
-                                clients[clientID].Close();
-                                clients.Remove(clientID);
-
-                                CallDisconnect(clientID);
-                                continue;
-                            }
-                        }
-
-                        ulong messageSize = Util.DecodeMessageSize(sizeBuffer);
-                        byte[] messageBuffer = new byte[messageSize];
-
-                        try
-                        {
-                            int bytesReceived = readSock.Receive(messageBuffer, Convert.ToInt32(messageSize), SocketFlags.None);
-
-                            if (bytesReceived == 0)
-                            {
-                                if (clients.ContainsKey(clientID))
-                                {
-                                    clients[clientID].Close();
-                                    clients.Remove(clientID);
-
-                                    CallDisconnect(clientID);
-                                    continue;
-                                }
-                            }
-                        }
-                        catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException)
-                        {
-                            if (clients.ContainsKey(clientID))
-                            {
-                                clients[clientID].Close();
-                                clients.Remove(clientID);
-
-                                CallDisconnect(clientID);
-                                continue;
-                            }
-                        }
-
-                        CallReceive(clientID, messageBuffer);
+                        CallDisconnect(clientId);
                     }
                 }
-
-                foreach (Socket errorSock in errorSocks)
-                {
-                    if (errorSock == sock)
-                    {
-                        if (serving)
-                        {
-                            Stop();
-                        }
-
-                        return;
-                    }
-                    else
-                    {
-                        ulong clientID = clients.FirstOrDefault(client => client.Value == errorSock).Key;
-
-                        if (clients.ContainsKey(clientID))
-                        {
-                            clients[clientID].Close();
-                            clients.Remove(clientID);
-
-                            CallDisconnect(clientID);
-                        }
-                    }
-                }
-            }
         }
-
-        /// <summary>
-        /// Call the receive event method.
-        /// </summary>
-        /// <param name="clientID">the ID of the client who sent the data.</param>
-        /// <param name="data">the data received from the client.</param>
-        private void CallReceive(ulong clientID, byte[] data)
-        {
-            if (eventBlocking)
-            {
-                Receive(clientID, data);
-            }
-            else
-            {
-                new Thread(() => Receive(clientID, data)).Start();
-            }
-        }
-
-        /// <summary>
-        /// Call the connect event method.
-        /// </summary>
-        /// <param name="clientID">the ID of the client who connected.</param>
-        private void CallConnect(ulong clientID)
-        {
-            if (eventBlocking)
-            {
-                Connect(clientID);
-            }
-            else
-            {
-                new Thread(() => Connect(clientID)).Start();
-            }
-        }
-
-        /// <summary>
-        /// Call the disconnect event method.
-        /// </summary>
-        /// <param name="clientID">the ID of the client who disconnected.</param>
-        private void CallDisconnect(ulong clientID)
-        {
-            if (eventBlocking)
-            {
-                Disconnect(clientID);
-            }
-            else
-            {
-                new Thread(() => Disconnect(clientID)).Start();
-            }
-        }
-
-        /// <summary>
-        /// An event method, called when data is received from a client.
-        /// </summary>
-        /// <param name="clientID">the ID of the client who sent the data.</param>
-        /// <param name="data">the data received from the client.</param>
-        protected abstract void Receive(ulong clientID, byte[] data);
-
-        /// <summary>
-        /// An event method, called when a client connects.
-        /// </summary>
-        /// <param name="clientID">the ID of the client who connected.</param>
-        protected abstract void Connect(ulong clientID);
-
-        /// <summary>
-        /// An event method, called when a client disconnects.
-        /// </summary>
-        /// <param name="clientID">the ID of the client who disconnected.</param>
-        protected abstract void Disconnect(ulong clientID);
     }
+
+    /// <summary>
+    ///     Call the receive event method.
+    /// </summary>
+    /// <param name="clientId">the ID of the client who sent the data.</param>
+    /// <param name="data">the data received from the client.</param>
+    private void CallReceive(ulong clientId, byte[] data)
+    {
+        new Thread(() => Receive(clientId, data)).Start();
+    }
+
+    /// <summary>
+    ///     Call the connect event method.
+    /// </summary>
+    /// <param name="clientId">the ID of the client who connected.</param>
+    private void CallConnect(ulong clientId)
+    {
+        new Thread(() => Connect(clientId)).Start();
+    }
+
+    /// <summary>
+    ///     Call the disconnect event method.
+    /// </summary>
+    /// <param name="clientId">the ID of the client who disconnected.</param>
+    private void CallDisconnect(ulong clientId)
+    {
+        new Thread(() => Disconnect(clientId)).Start();
+    }
+
+    /// <summary>
+    ///     An event method, called when data is received from a client.
+    /// </summary>
+    /// <param name="clientId">the ID of the client who sent the data.</param>
+    /// <param name="data">the data received from the client.</param>
+    protected abstract void Receive(ulong clientId, byte[] data);
+
+    /// <summary>
+    ///     An event method, called when a client connects.
+    /// </summary>
+    /// <param name="clientId">the ID of the client who connected.</param>
+    protected abstract void Connect(ulong clientId);
+
+    /// <summary>
+    ///     An event method, called when a client disconnects.
+    /// </summary>
+    /// <param name="clientId">the ID of the client who disconnected.</param>
+    protected abstract void Disconnect(ulong clientId);
 }
