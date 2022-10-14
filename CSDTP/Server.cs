@@ -96,9 +96,9 @@ public abstract class Server<S, R>
 
         foreach (var client in _clients)
         {
+            _clients.Remove(client.Key);
             client.Value.Shutdown(SocketShutdown.Both);
             client.Value.Close();
-            _clients.Remove(client.Key);
         }
 
         _sock?.Close();
@@ -155,9 +155,9 @@ public abstract class Server<S, R>
 
         if (client != null)
         {
+            _clients.Remove(clientId);
             client.Shutdown(SocketShutdown.Both);
             client.Close();
-            _clients.Remove(clientId);
         }
         else
         {
@@ -323,25 +323,33 @@ public abstract class Server<S, R>
                         var bytesReceived = readSock.Receive(sizeBuffer, Util.LenSize, SocketFlags.None);
 
                         if (bytesReceived == 0)
-                            if (_clients.ContainsKey(clientId))
+                        {
+                            var client = _clients.GetValueOrDefault(clientId);
+
+                            if (client != null)
                             {
-                                _clients[clientId].Close();
                                 _clients.Remove(clientId);
+                                client.Close();
 
                                 CallDisconnect(clientId);
-                                continue;
                             }
+
+                            continue;
+                        }
                     }
                     catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException)
                     {
-                        if (_clients.ContainsKey(clientId))
+                        var client = _clients.GetValueOrDefault(clientId);
+
+                        if (client != null)
                         {
-                            _clients[clientId].Close();
                             _clients.Remove(clientId);
+                            client.Close();
 
                             CallDisconnect(clientId);
-                            continue;
                         }
+
+                        continue;
                     }
 
                     var messageSize = Util.DecodeMessageSize(sizeBuffer);
@@ -354,10 +362,12 @@ public abstract class Server<S, R>
 
                         if (bytesReceived == 0)
                         {
-                            if (_clients.ContainsKey(clientId))
+                            var client = _clients.GetValueOrDefault(clientId);
+
+                            if (client != null)
                             {
-                                _clients[clientId].Close();
                                 _clients.Remove(clientId);
+                                client.Close();
 
                                 CallDisconnect(clientId);
                             }
@@ -367,10 +377,12 @@ public abstract class Server<S, R>
                     }
                     catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException)
                     {
-                        if (_clients.ContainsKey(clientId))
+                        var client = _clients.GetValueOrDefault(clientId);
+
+                        if (client != null)
                         {
-                            _clients[clientId].Close();
                             _clients.Remove(clientId);
+                            client.Close();
 
                             CallDisconnect(clientId);
                         }
