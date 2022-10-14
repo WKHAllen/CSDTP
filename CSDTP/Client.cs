@@ -7,7 +7,9 @@ namespace CSDTP;
 /// <summary>
 ///     A socket client.
 /// </summary>
-public abstract class Client
+/// <typeparam name="S">The type of data that will be sent.</typeparam>
+/// <typeparam name="R">The type of data that will be received.</typeparam>
+public abstract class Client<S, R>
 {
     /// <summary>
     ///     If the client is currently connected to a server.
@@ -92,11 +94,12 @@ public abstract class Client
     /// </summary>
     /// <param name="data">the data to send.</param>
     /// <exception cref="CSDTPException">Thrown when the client is not connected to a server.</exception>
-    public void Send(byte[] data)
+    public void Send(S data)
     {
         if (!_connected) throw new CSDTPException("client is not connected to a server");
 
-        var encodedData = Util.EncodeMessage(data);
+        var serializedData = Util.Serialize(data);
+        var encodedData = Util.EncodeMessage(serializedData);
         _sock?.Send(encodedData);
     }
 
@@ -238,7 +241,10 @@ public abstract class Client
     /// <param name="data">the data received from the server.</param>
     private void CallReceive(byte[] data)
     {
-        new Thread(() => Receive(data)).Start();
+        var deserializedData = Util.Deserialize<R>(data);
+
+        if (deserializedData != null)
+            new Thread(() => Receive(deserializedData)).Start();
     }
 
     /// <summary>
@@ -253,7 +259,7 @@ public abstract class Client
     ///     An event method, called when data is received from the server.
     /// </summary>
     /// <param name="data">the data received from the server.</param>
-    protected abstract void Receive(byte[] data);
+    protected abstract void Receive(R data);
 
     /// <summary>
     ///     An event method, called when the server has disconnected the client.

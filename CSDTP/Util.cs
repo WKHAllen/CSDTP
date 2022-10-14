@@ -1,16 +1,20 @@
 ﻿using System.Net;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+
+[assembly: InternalsVisibleTo("CSDTPTest")]
 
 namespace CSDTP;
 
 /// <summary>
 ///     CSDTP utilities.
 /// </summary>
-internal class Util
+internal static class Util
 {
     /// <summary>
     ///     The length of the size portion of each message.
     /// </summary>
-    public static readonly int LenSize = 5;
+    public const int LenSize = 5;
 
     /// <summary>
     ///     The default host.
@@ -26,6 +30,28 @@ internal class Util
     ///     The server listen backlog.
     /// </summary>
     public static readonly int ListenBacklog = 8;
+
+    /// <summary>
+    ///     Serialize an object to bytes.
+    /// </summary>
+    /// <param name="obj">The object to serialize.</param>
+    /// <typeparam name="T">The type of object being serialized.</typeparam>
+    /// <returns>The resulting bytes.</returns>
+    public static byte[] Serialize<T>(T obj)
+    {
+        return JsonSerializer.SerializeToUtf8Bytes(obj);
+    }
+
+    /// <summary>
+    ///     Deserialize an object from bytes.
+    /// </summary>
+    /// <param name="bytes">The bytes to deserialize.</param>
+    /// <typeparam name="T">The type of the object being deserialized.</typeparam>
+    /// <returns>The resulting object.</returns>
+    public static T? Deserialize<T>(byte[] bytes)
+    {
+        return JsonSerializer.Deserialize<T>(bytes);
+    }
 
     /// <summary>
     ///     Encode the size portion of a message to bytes.

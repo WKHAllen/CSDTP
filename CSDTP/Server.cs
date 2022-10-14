@@ -7,7 +7,9 @@ namespace CSDTP;
 /// <summary>
 ///     A socket server.
 /// </summary>
-public abstract class Server
+/// <typeparam name="S">The type of data that will be sent.</typeparam>
+/// <typeparam name="R">The type of data that will be received.</typeparam>
+public abstract class Server<S, R>
 {
     /// <summary>
     ///     A collection of the client sockets.
@@ -110,7 +112,7 @@ public abstract class Server
     /// <param name="clientId">the ID of the client to send the data to.</param>
     /// <param name="data">the data to send.</param>
     /// <exception cref="CSDTPException">Thrown when the server is not serving, or the specified client does not exist.</exception>
-    public void Send(ulong clientId, byte[] data)
+    public void Send(ulong clientId, S data)
     {
         if (!_serving) throw new CSDTPException("server is not serving");
 
@@ -118,7 +120,8 @@ public abstract class Server
 
         if (client != null)
         {
-            var encodedData = Util.EncodeMessage(data);
+            var serializedData = Util.Serialize(data);
+            var encodedData = Util.EncodeMessage(serializedData);
             client.Send(encodedData);
         }
         else
@@ -132,13 +135,11 @@ public abstract class Server
     /// </summary>
     /// <param name="data">the data to send</param>
     /// <exception cref="CSDTPException">Thrown when the server is not serving.</exception>
-    public void SendAll(byte[] data)
+    public void SendAll(S data)
     {
         if (!_serving) throw new CSDTPException("server is not serving");
 
-        var encodedData = Util.EncodeMessage(data);
-
-        foreach (var client in _clients) client.Value.Send(encodedData);
+        foreach (var client in _clients) Send(client.Key, data);
     }
 
     /// <summary>
@@ -352,14 +353,17 @@ public abstract class Server
                             readSock.Receive(messageBuffer, Convert.ToInt32(messageSize), SocketFlags.None);
 
                         if (bytesReceived == 0)
+                        {
                             if (_clients.ContainsKey(clientId))
                             {
                                 _clients[clientId].Close();
                                 _clients.Remove(clientId);
 
                                 CallDisconnect(clientId);
-                                continue;
                             }
+
+                            continue;
+                        }
                     }
                     catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException)
                     {
@@ -369,8 +373,9 @@ public abstract class Server
                             _clients.Remove(clientId);
 
                             CallDisconnect(clientId);
-                            continue;
                         }
+
+                        continue;
                     }
 
                     CallReceive(clientId, messageBuffer);
@@ -405,7 +410,10 @@ public abstract class Server
     /// <param name="data">the data received from the client.</param>
     private void CallReceive(ulong clientId, byte[] data)
     {
-        new Thread(() => Receive(clientId, data)).Start();
+        var deserializedData = Util.Deserialize<R>(data);
+
+        if (deserializedData != null)
+            new Thread(() => Receive(clientId, deserializedData)).Start();
     }
 
     /// <summary>
@@ -431,7 +439,7 @@ public abstract class Server
     /// </summary>
     /// <param name="clientId">the ID of the client who sent the data.</param>
     /// <param name="data">the data received from the client.</param>
-    protected abstract void Receive(ulong clientId, byte[] data);
+    protected abstract void Receive(ulong clientId, R data);
 
     /// <summary>
     ///     An event method, called when a client connects.

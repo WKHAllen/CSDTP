@@ -1,33 +1,34 @@
-﻿using System;
-using System.Text;
+﻿using System.Collections.Generic;
 using CSDTP;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace CSDTPTest;
 
-internal class TestClient : Client
+internal class TestClient<S, R> : Client<S, R>
 {
-    public byte[]? RandomMessage;
-    public bool ReceivingRandomMessage;
-
-    protected override void Receive(byte[] data)
+    public TestClient(int receiveCount, int disconnectedCount)
     {
-        if (!ReceivingRandomMessage)
-        {
-            var message = Encoding.UTF8.GetString(data);
-            Console.WriteLine("[CLIENT] Received data from server: {0} (size {1})", message, message.Length);
-        }
-        else
-        {
-            Console.WriteLine("[CLIENT] Received large random message from server (size {0}, {1})", data.Length,
-                RandomMessage?.Length);
-            Assert.AreEqual(data.Length, RandomMessage?.Length);
-            CollectionAssert.AreEqual(data, RandomMessage);
-        }
+        ReceiveCount = receiveCount;
+        DisconnectedCount = disconnectedCount;
+    }
+
+    public int ReceiveCount { get; private set; }
+    public int DisconnectedCount { get; private set; }
+
+    public List<R> Received { get; } = new();
+
+    public bool EventsDone()
+    {
+        return ReceiveCount == 0 && DisconnectedCount == 0;
+    }
+
+    protected override void Receive(R data)
+    {
+        ReceiveCount--;
+        Received.Add(data);
     }
 
     protected override void Disconnected()
     {
-        Console.WriteLine("[CLIENT] Unexpectedly disconnected from server");
+        DisconnectedCount--;
     }
 }
