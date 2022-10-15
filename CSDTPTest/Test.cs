@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using CSDTP;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -61,7 +62,21 @@ public class Test
     [TestMethod]
     public void TestCrypto()
     {
-        // TODO: test crypto
+        // Test RSA
+        var rsaMessage = Encoding.ASCII.GetBytes("Hello, RSA!");
+        var (publicKey, privateKey) = Crypto.NewRsaKeys();
+        var rsaEncrypted = Crypto.RsaEncrypt(publicKey, rsaMessage);
+        var rsaDecrypted = Crypto.RsaDecrypt(privateKey, rsaEncrypted);
+        CollectionAssert.AreEqual(rsaDecrypted, rsaMessage);
+        CollectionAssert.AreNotEqual(rsaEncrypted, rsaMessage);
+
+        // Test AES
+        var aesMessage = Encoding.ASCII.GetBytes("Hello, AES!");
+        var key = Crypto.NewAesKey();
+        var aesEncrypted = Crypto.AesEncrypt(key, aesMessage);
+        var aesDecrypted = Crypto.AesDecrypt(key, aesEncrypted);
+        CollectionAssert.AreEqual(aesDecrypted, aesMessage);
+        CollectionAssert.AreNotEqual(aesEncrypted, aesMessage);
     }
 
     [TestMethod]
