@@ -22,6 +22,11 @@ public abstract class Client<S, R>
     private Thread? _handleThread;
 
     /// <summary>
+    ///     The client crypto key.
+    /// </summary>
+    private byte[]? _key;
+
+    /// <summary>
     ///     The client socket.
     /// </summary>
     private Socket? _sock;
@@ -44,6 +49,9 @@ public abstract class Client<S, R>
         _sock.Connect(ipe);
 
         _connected = true;
+
+        ExchangeKeys();
+
         CallHandle();
     }
 
@@ -99,7 +107,8 @@ public abstract class Client<S, R>
         if (!_connected) throw new CSDTPException("client is not connected to a server");
 
         var serializedData = Util.Serialize(data);
-        var encodedData = Util.EncodeMessage(serializedData);
+        var encryptedData = Crypto.AesEncrypt(_key, serializedData);
+        var encodedData = Util.EncodeMessage(encryptedData);
         _sock?.Send(encodedData);
     }
 
@@ -236,12 +245,37 @@ public abstract class Client<S, R>
     }
 
     /// <summary>
+    ///     Exchange crypto keys with the server.
+    /// </summary>
+    private void ExchangeKeys()
+    {
+        var sizeBuffer = new byte[Util.LenSize];
+        var bytesReceived = _sock?.Receive(sizeBuffer, Util.LenSize, SocketFlags.None);
+
+        if (bytesReceived != Util.LenSize) throw new CSDTPException("invalid number of bytes received");
+
+        var messageSize = Util.DecodeMessageSize(sizeBuffer);
+        var messageBuffer = new byte[messageSize];
+        bytesReceived = _sock?.Receive(messageBuffer, Convert.ToInt32(messageSize), SocketFlags.None);
+
+        if (bytesReceived != Convert.ToInt32(messageSize)) throw new CSDTPException("invalid number of bytes received");
+
+        var key = Crypto.NewAesKey();
+        var keyEncrypted = Crypto.RsaEncrypt(messageBuffer, key);
+        var keyEncoded = Util.EncodeMessage(keyEncrypted);
+        _sock?.Send(keyEncoded);
+
+        _key = key;
+    }
+
+    /// <summary>
     ///     Call the receive event method.
     /// </summary>
     /// <param name="data">the data received from the server.</param>
     private void CallReceive(byte[] data)
     {
-        var deserializedData = Util.Deserialize<R>(data);
+        var decryptedData = Crypto.AesDecrypt(_key, data);
+        var deserializedData = Util.Deserialize<R>(decryptedData);
 
         if (deserializedData != null)
             new Thread(() => Receive(deserializedData)).Start();

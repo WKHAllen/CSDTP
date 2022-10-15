@@ -17,6 +17,11 @@ public abstract class Server<S, R>
     private readonly Dictionary<ulong, Socket> _clients = new();
 
     /// <summary>
+    ///     A collection of the client crypto keys.
+    /// </summary>
+    private readonly Dictionary<ulong, byte[]> _keys = new();
+
+    /// <summary>
     ///     The next available client ID.
     /// </summary>
     private ulong _nextClientId;
@@ -99,6 +104,7 @@ public abstract class Server<S, R>
             _clients.Remove(client.Key);
             client.Value.Shutdown(SocketShutdown.Both);
             client.Value.Close();
+            _keys.Remove(client.Key);
         }
 
         _sock?.Close();
@@ -117,11 +123,13 @@ public abstract class Server<S, R>
         if (!_serving) throw new CSDTPException("server is not serving");
 
         var client = _clients.GetValueOrDefault(clientId);
+        var key = _keys[clientId];
 
         if (client != null)
         {
             var serializedData = Util.Serialize(data);
-            var encodedData = Util.EncodeMessage(serializedData);
+            var encryptedData = Crypto.AesEncrypt(key, serializedData);
+            var encodedData = Util.EncodeMessage(encryptedData);
             client.Send(encodedData);
         }
         else
@@ -158,6 +166,7 @@ public abstract class Server<S, R>
             _clients.Remove(clientId);
             client.Shutdown(SocketShutdown.Both);
             client.Close();
+            _keys.Remove(clientId);
         }
         else
         {
@@ -309,6 +318,8 @@ public abstract class Server<S, R>
                     var newClient = _sock.Accept();
                     var newClientId = NewClientId();
 
+                    ExchangeKeys(newClientId, newClient);
+
                     _clients.Add(newClientId, newClient);
 
                     CallConnect(newClientId);
@@ -330,6 +341,7 @@ public abstract class Server<S, R>
                             {
                                 _clients.Remove(clientId);
                                 client.Close();
+                                _keys.Remove(clientId);
 
                                 CallDisconnect(clientId);
                             }
@@ -345,6 +357,7 @@ public abstract class Server<S, R>
                         {
                             _clients.Remove(clientId);
                             client.Close();
+                            _keys.Remove(clientId);
 
                             CallDisconnect(clientId);
                         }
@@ -368,6 +381,7 @@ public abstract class Server<S, R>
                             {
                                 _clients.Remove(clientId);
                                 client.Close();
+                                _keys.Remove(clientId);
 
                                 CallDisconnect(clientId);
                             }
@@ -383,6 +397,7 @@ public abstract class Server<S, R>
                         {
                             _clients.Remove(clientId);
                             client.Close();
+                            _keys.Remove(clientId);
 
                             CallDisconnect(clientId);
                         }
@@ -408,11 +423,38 @@ public abstract class Server<S, R>
                     {
                         _clients[clientId].Close();
                         _clients.Remove(clientId);
+                        _keys.Remove(clientId);
 
                         CallDisconnect(clientId);
                     }
                 }
         }
+    }
+
+    /// <summary>
+    ///     Exchange crypto keys with a client.
+    /// </summary>
+    /// <param name="clientId">The ID of the new client.</param>
+    /// <param name="client">The client socket.</param>
+    private void ExchangeKeys(ulong clientId, Socket client)
+    {
+        var (publicKey, privateKey) = Crypto.NewRsaKeys();
+        var publicKeyEncoded = Util.EncodeMessage(publicKey);
+        client.Send(publicKeyEncoded);
+
+        var sizeBuffer = new byte[Util.LenSize];
+        var bytesReceived = client.Receive(sizeBuffer, Util.LenSize, SocketFlags.None);
+
+        if (bytesReceived != Util.LenSize) throw new CSDTPException("invalid number of bytes received");
+
+        var messageSize = Util.DecodeMessageSize(sizeBuffer);
+        var messageBuffer = new byte[messageSize];
+        bytesReceived = client.Receive(messageBuffer, Convert.ToInt32(messageSize), SocketFlags.None);
+
+        if (bytesReceived != Convert.ToInt32(messageSize)) throw new CSDTPException("invalid number of bytes received");
+
+        var key = Crypto.RsaDecrypt(privateKey, messageBuffer);
+        _keys.Add(clientId, key);
     }
 
     /// <summary>
@@ -422,7 +464,9 @@ public abstract class Server<S, R>
     /// <param name="data">the data received from the client.</param>
     private void CallReceive(ulong clientId, byte[] data)
     {
-        var deserializedData = Util.Deserialize<R>(data);
+        var key = _keys[clientId];
+        var decryptedData = Crypto.AesDecrypt(key, data);
+        var deserializedData = Util.Deserialize<R>(decryptedData);
 
         if (deserializedData != null)
             new Thread(() => Receive(clientId, deserializedData)).Start();
