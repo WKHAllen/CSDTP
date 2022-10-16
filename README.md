@@ -55,18 +55,18 @@ using CSDTP;
 // Create a client that sends a message to the server and receives the length of the message
 public class MyClient : Client<string, int>
 {
-    private readonly string message;
+    private readonly string _message;
 
     public MyClient(string message)
     {
-        this.message = message;
+        _message = message;
     }
 
     protected override void Receive(int data)
     {
         // Validate the response
-        Console.WriteLine("Received response from server: {0}\n", data);
-        Assert.AreEqual(data, message.Length);
+        Console.WriteLine("Received response from server: {0}", data);
+        Assert.AreEqual(data, _message.Length);
     }
 
     protected override void Disconnected()
