@@ -1,9 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PackageId>CSDTP</PackageId>
+        <PackageVersion>0.1.0</PackageVersion>
+        <Version>0.1.0</Version>
+        <Authors>Will Allen</Authors>
+        <Title>Data Transfer Protocol for C#</Title>
+        <Description>Modern networking interfaces for C#.</Description>
+        <Summary>Modern networking interfaces for C#.</Summary>
+        <PackageProjectUrl>https://wkhallen.com/dtp/</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/WKHAllen/CSDTP</RepositoryUrl>
+        <PackageTags>socket;networking</PackageTags>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\LICENSE" Pack="true" PackagePath=""/>
+        <None Include="..\README.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
 
 </Project>
