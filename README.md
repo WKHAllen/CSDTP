@@ -7,6 +7,14 @@ Modern networking interfaces for C#.
 The Data Transfer Protocol (DTP) is a larger project to make ergonomic network programming available in any language.
 See the full project [here](https://wkhallen.com/dtp/).
 
+## Installation
+
+Install the package:
+
+```sh
+$ nuget install CSDTP
+```
+
 ## Creating a server
 
 A server can be built using the `Server` implementation:
