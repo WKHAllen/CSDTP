@@ -105,6 +105,7 @@ public abstract class Client<S, R>
     public void Send(S data)
     {
         if (!_connected) throw new CSDTPException("client is not connected to a server");
+        if (_key == null) throw new CSDTPException("crypto key does not exist");
 
         var serializedData = Util.Serialize(data);
         var encryptedData = Crypto.AesEncrypt(_key, serializedData);
@@ -274,6 +275,8 @@ public abstract class Client<S, R>
     /// <param name="data">the data received from the server.</param>
     private void CallReceive(byte[] data)
     {
+        if (_key == null) throw new CSDTPException("crypto key does not exist");
+
         var decryptedData = Crypto.AesDecrypt(_key, data);
         var deserializedData = Util.Deserialize<R>(decryptedData);
 

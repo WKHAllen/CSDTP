@@ -53,7 +53,11 @@ public static class Crypto
     {
         var publicKeyStream = new MemoryStream(publicKey);
         var publicKeySerializer = new XmlSerializer(typeof(RSAParameters));
-        var deserializedPublicKey = (RSAParameters)publicKeySerializer.Deserialize(publicKeyStream);
+        var deserializedPublicKeyObj = publicKeySerializer.Deserialize(publicKeyStream);
+
+        if (deserializedPublicKeyObj == null) throw new CSDTPException("invalid public key");
+
+        var deserializedPublicKey = (RSAParameters)deserializedPublicKeyObj;
 
         var cipher = new RSACryptoServiceProvider();
         cipher.ImportParameters(deserializedPublicKey);
@@ -71,7 +75,11 @@ public static class Crypto
     {
         var privateKeyStream = new MemoryStream(privateKey);
         var privateKeySerializer = new XmlSerializer(typeof(RSAParameters));
-        var deserializedPrivateKey = (RSAParameters)privateKeySerializer.Deserialize(privateKeyStream);
+        var deserializedPrivateKeyObj = privateKeySerializer.Deserialize(privateKeyStream);
+
+        if (deserializedPrivateKeyObj == null) throw new CSDTPException("invalid private key");
+
+        var deserializedPrivateKey = (RSAParameters)deserializedPrivateKeyObj;
 
         var cipher = new RSACryptoServiceProvider();
         cipher.ImportParameters(deserializedPrivateKey);
