@@ -235,6 +235,10 @@ public abstract class Server<S, R>
     {
         if (!_serving) throw new CSDTPException("server is not serving");
 
+        Console.WriteLine("Checking client with ID {0}", clientId);
+        Console.WriteLine("Clients:");
+        foreach (var c in _clients) Console.WriteLine("Client with ID: {0}", c.Key);
+
         var client = _clients.GetValueOrDefault(clientId);
 
         if (client == null) throw new CSDTPException("client does not exist");
