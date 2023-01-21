@@ -337,16 +337,16 @@ public class Test
 
         // Send messages
         var serverMessage = new Custom();
-        serverMessage.a = 123;
-        serverMessage.b = "Hello, custom server class!";
-        serverMessage.c.Add("first server item");
-        serverMessage.c.Add("second server item");
+        serverMessage.A = 123;
+        serverMessage.B = "Hello, custom server class!";
+        serverMessage.C.Add("first server item");
+        serverMessage.C.Add("second server item");
         var clientMessage = new Custom();
-        clientMessage.a = 456;
-        clientMessage.b = "Hello, custom client class!";
-        clientMessage.c.Add("#1 client item");
-        clientMessage.c.Add("client item #2");
-        clientMessage.c.Add("(3) client item");
+        clientMessage.A = 456;
+        clientMessage.B = "Hello, custom client class!";
+        clientMessage.C.Add("#1 client item");
+        clientMessage.C.Add("client item #2");
+        clientMessage.C.Add("(3) client item");
         c.Send(serverMessage);
         s.Send(0, clientMessage);
         Thread.Sleep(WaitTime);

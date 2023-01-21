@@ -5,15 +5,20 @@ namespace CSDTPTest;
 
 internal class Custom
 {
-    public int a { get; set; } = 0;
-    public string b { get; set; } = "";
-    public List<string> c { get; set; } = new();
+    public int A { get; set; } = 0;
+    public string B { get; set; } = "";
+    public List<string> C { get; set; } = new();
 
     public override bool Equals(object? obj)
     {
         if (obj == null || !(GetType() == obj.GetType())) return false;
 
         var other = (Custom)obj;
-        return a == other.a && b == other.b && c.SequenceEqual(other.c);
+        return A == other.A && B == other.B && C.SequenceEqual(other.C);
+    }
+
+    public override int GetHashCode()
+    {
+        return 0;
     }
 }
