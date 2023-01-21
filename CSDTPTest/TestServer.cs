@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using CSDTP;
 
 namespace CSDTPTest;
@@ -35,6 +36,7 @@ internal class TestServer<S, R> : Server<S, R>
 
     protected override void Receive(ulong clientId, R data)
     {
+        Console.WriteLine("Received data from client {0}", clientId);
         ReceiveCount--;
         Received.Add(data);
         ReceivedClientIDs.Add(clientId);
@@ -50,12 +52,14 @@ internal class TestServer<S, R> : Server<S, R>
 
     protected override void Connect(ulong clientId)
     {
+        Console.WriteLine("Client with ID {0} connected", clientId);
         ConnectCount--;
         ConnectClientIDs.Add(clientId);
     }
 
     protected override void Disconnect(ulong clientId)
     {
+        Console.WriteLine("Client with ID {0} disconnected", clientId);
         DisconnectCount--;
         DisconnectClientIDs.Add(clientId);
     }
