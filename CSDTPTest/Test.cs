@@ -136,6 +136,11 @@ public class Test
         // Check addresses match
         Assert.AreEqual(s.GetHost(), c.GetServerHost());
         Assert.AreEqual(s.GetPort(), c.GetServerPort());
+        Console.WriteLine("Client connected: {0}", c.IsConnected());
+        Console.WriteLine("Connected clients:");
+        foreach (var clientId in s.ConnectClientIDs) Console.WriteLine("  {0}", clientId);
+        Console.WriteLine("Disconnected clients:");
+        foreach (var clientId in s.DisconnectClientIDs) Console.WriteLine("  {0}", clientId);
         Assert.AreEqual(c.GetHost(), s.GetClientHost(0));
         Assert.AreEqual(c.GetPort(), s.GetClientPort(0));
 
