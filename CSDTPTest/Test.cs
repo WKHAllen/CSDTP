@@ -77,6 +77,12 @@ public class Test
         var aesDecrypted = Crypto.AesDecrypt(key, aesEncrypted);
         CollectionAssert.AreEqual(aesDecrypted, aesMessage);
         CollectionAssert.AreNotEqual(aesEncrypted, aesMessage);
+
+        // Test encrypting/decrypting AES key with RSA
+        var encryptedKey = Crypto.RsaEncrypt(publicKey, key);
+        var decryptedKey = Crypto.RsaDecrypt(privateKey, encryptedKey);
+        CollectionAssert.AreEqual(decryptedKey, key);
+        CollectionAssert.AreNotEqual(encryptedKey, key);
     }
 
     [TestMethod]
@@ -311,6 +317,61 @@ public class Test
         Assert.AreEqual(c.DisconnectedCount, 0);
         Assert.IsTrue(c.EventsDone());
         CollectionAssert.AreEqual(c.Received.ToArray(), clientMessages);
+    }
+
+    [TestMethod]
+    public void TestSendingCustomTypes()
+    {
+        // Create server
+        var s = new TestServer<Custom, Custom>(1, 1, 1);
+        s.Start();
+        var serverHost = s.GetHost();
+        var serverPort = s.GetPort();
+        Console.WriteLine("Server address: {0}:{1}", serverHost, serverPort);
+        Thread.Sleep(WaitTime);
+
+        // Create client
+        var c = new TestClient<Custom, Custom>(1, 0);
+        c.Connect(serverHost, serverPort);
+        Thread.Sleep(WaitTime);
+
+        // Send messages
+        var serverMessage = new Custom();
+        serverMessage.A = 123;
+        serverMessage.B = "Hello, custom server class!";
+        serverMessage.C.Add("first server item");
+        serverMessage.C.Add("second server item");
+        var clientMessage = new Custom();
+        clientMessage.A = 456;
+        clientMessage.B = "Hello, custom client class!";
+        clientMessage.C.Add("#1 client item");
+        clientMessage.C.Add("client item #2");
+        clientMessage.C.Add("(3) client item");
+        c.Send(serverMessage);
+        s.Send(0, clientMessage);
+        Thread.Sleep(WaitTime);
+
+        // Disconnect client
+        c.Disconnect();
+        Thread.Sleep(WaitTime);
+
+        // Stop server
+        s.Stop();
+        Thread.Sleep(WaitTime);
+
+        // Check event counts
+        Assert.AreEqual(s.ReceiveCount, 0);
+        Assert.AreEqual(s.ConnectCount, 0);
+        Assert.AreEqual(s.DisconnectCount, 0);
+        Assert.IsTrue(s.EventsDone());
+        CollectionAssert.AreEqual(s.Received, new List<Custom> { serverMessage });
+        CollectionAssert.AreEqual(s.ReceivedClientIDs, new List<ulong> { 0 });
+        CollectionAssert.AreEqual(s.ConnectClientIDs, new List<ulong> { 0 });
+        CollectionAssert.AreEqual(s.DisconnectClientIDs, new List<ulong> { 0 });
+        Assert.AreEqual(c.ReceiveCount, 0);
+        Assert.AreEqual(c.DisconnectedCount, 0);
+        Assert.IsTrue(c.EventsDone());
+        CollectionAssert.AreEqual(c.Received, new List<Custom> { clientMessage });
     }
 
     [TestMethod]

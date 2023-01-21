@@ -101,4 +101,4 @@ public class Main
 ## Security
 
 Information security comes included. Every message sent over a network interface is encrypted with AES-256. Key
-exchanges are performed using a 4096-bit RSA key-pair.
+exchanges are performed using a 2048-bit RSA key-pair.

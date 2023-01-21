@@ -12,7 +12,7 @@ public static class Crypto
     /// <summary>
     ///     The RSA key size.
     /// </summary>
-    private const int RsaKeySize = 4096;
+    private const int RsaKeySize = 2048;
 
     /// <summary>
     ///     The AES key size.
